@@ -4,6 +4,7 @@ import { LayoutDashboard, BookOpen, CreditCard } from "lucide-react";
 import MobileHome from "./MobileHome";
 import MobileModules from "./MobileModules";
 import MobileLesson from "./MobileLesson";
+import MobileFlashcards from "./MobileFlashcards";
 
 export default function MobileApp() {
   const { progress } = useProgress();
@@ -25,7 +26,7 @@ export default function MobileApp() {
 
   let body;
   if (view === "home") body = <MobileHome onOpenLesson={(m, l) => { setActiveModule(m); setActiveLesson(l); setView("lesson"); }} onGoModules={() => setView("modules")} />;
-  else if (view === "flash") body = <div className="card" style={{ padding: 20 }}>Flashcards (Task 6)</div>;
+  else if (view === "flash") body = <MobileFlashcards />;
   else if (view === "lesson" && activeLesson) body = <MobileLesson mod={activeModule} lesson={activeLesson} onBack={() => setView("modules")} />;
   else body = <MobileModules
     activeModule={view === "modules" ? activeModule : null}
