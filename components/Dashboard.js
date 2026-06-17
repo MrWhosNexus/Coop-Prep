@@ -13,6 +13,7 @@ import FlashcardDeck from "./FlashcardDeck";
 import { ProgressProvider, useProgress } from "./ProgressContext";
 import MomentumStrip from "./MomentumStrip";
 import RewardLayer from "./RewardLayer";
+import FocusTimer from "./FocusTimer";
 
 /* ─────────────────────────────────────────── */
 /*  Root                                       */
@@ -215,6 +216,9 @@ function AppShell({ progress, days, readiness, view, activeModule, onNav, childr
               <span style={{ fontSize: 11, color: "var(--text-3)" }}>day</span>
             </div>
           </div>
+
+          {/* Focus Timer */}
+          <FocusTimer />
         </div>
       </aside>
 
