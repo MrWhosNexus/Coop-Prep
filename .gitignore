@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# mobile single-file build artifact (rebuildable)
+/mobile/dist
+
+# graphify graph data (regenerable)
+/graphify-out

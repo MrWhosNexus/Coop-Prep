@@ -1,0 +1,57 @@
+import { useState } from "react";
+import { useProgress } from "@/components/ProgressContext";
+import { LayoutDashboard, BookOpen, CreditCard } from "lucide-react";
+import MobileHome from "./MobileHome";
+import MobileModules from "./MobileModules";
+import MobileLesson from "./MobileLesson";
+import MobileFlashcards from "./MobileFlashcards";
+
+export default function MobileApp() {
+  const { progress } = useProgress();
+  const [view, setView] = useState("home");          // home | modules | lesson | flash
+  const [activeModule, setActiveModule] = useState(null);
+  const [activeLesson, setActiveLesson] = useState(null);
+
+  if (!progress) {
+    return (
+      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "2px solid var(--blue)", borderTopColor: "transparent", animation: "spin 0.7s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
+  // Tab → top-level view. "modules" tab shows the module list (or a drilled-in module/lesson).
+  const tab = view === "lesson" ? "modules" : view;
+
+  let body;
+  if (view === "home") body = <MobileHome onOpenLesson={(m, l) => { setActiveModule(m); setActiveLesson(l); setView("lesson"); }} onGoModules={() => setView("modules")} />;
+  else if (view === "flash") body = <MobileFlashcards />;
+  else if (view === "lesson" && activeLesson) body = <MobileLesson mod={activeModule} lesson={activeLesson} onBack={() => setView("modules")} />;
+  else body = <MobileModules
+    activeModule={view === "modules" ? activeModule : null}
+    onOpenModule={(m) => setActiveModule(m)}
+    onOpenLesson={(m, l) => { setActiveModule(m); setActiveLesson(l); setView("lesson"); }}
+    onBack={() => setActiveModule(null)} />;
+
+  const TABS = [
+    { id: "home",   label: "Home",       icon: LayoutDashboard },
+    { id: "modules",label: "Modules",    icon: BookOpen },
+    { id: "flash",  label: "Flashcards", icon: CreditCard },
+  ];
+
+  return (
+    <>
+      <div className="mobile-main">{body}</div>
+      <nav className="tab-bar">
+        {TABS.map(({ id, label, icon: Icon }) => (
+          <button key={id} className={`tab-btn ${tab === id ? "active" : ""}`}
+            onClick={() => { setView(id); setActiveModule(null); setActiveLesson(null); }}>
+            <Icon size={20} />
+            {label}
+          </button>
+        ))}
+      </nav>
+    </>
+  );
+}
