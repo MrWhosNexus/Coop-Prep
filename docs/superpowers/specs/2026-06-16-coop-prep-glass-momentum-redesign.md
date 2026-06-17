@@ -15,6 +15,45 @@ This supersedes the earlier design decision (recorded in the second-brain wiki)
 that glassmorphism was rejected as "claustrophobic." The user has explicitly
 reversed that decision and chosen full glass.
 
+## Current state (verified 2026-06-16) — IMPORTANT correction
+
+The wiki is wrong on two counts. The repo does **not** ship the solid
+"fintech-dark" theme the wiki describes, and the app is **not** visually
+complete. The actual state:
+
+- `app/globals.css` defines a glassmorphism sheet (violet/blue radial gradient
+  background; `.glass`, `.glass-md`, `.cta`, `.option-btn`, `.xp-pill`,
+  `.step-card-*`; tokens `--violet`, `--blue`, `--text`, `--glass-*`).
+- The three components (`Dashboard.js`, `LessonViewer.js`, `FlashcardDeck.js`)
+  reference a **completely different vocabulary that `globals.css` never
+  defines**: structural tokens `--bg`, `--card`, `--card-2`, `--card-hover`,
+  `--sidebar`, `--sidebar-w`, `--border`, `--border-2`, radii `--r-sm/-md/-lg/-xl`,
+  accent dims/rings `--gold-dim`, `--blue-dim`, `--blue-ring`, `--green-dim`,
+  `--green-ring`, `--red-dim`, `--shadow-2`; and classes `.card`, `.card-2`,
+  `.card-btn`, `.btn-primary`, `.btn-ghost`, `.nav-item`(+`.active`), `.nav-dot`,
+  `.section-label`, `.divider`, `.progress-track`/`.progress-fill`, plus the
+  `ring-fill` keyframe and the `.scalein` class.
+- `layout.js` imports only `globals.css`. So those names resolve to nothing and
+  the app renders **largely unstyled** (text colors only, no surfaces, no
+  sidebar, no buttons). Only the color tokens `--blue(-2)`, `--gold(-2)`,
+  `--green(-2)`, `--red`, `--text(-2/-3)` and the `.badge*`/`.fadein` classes
+  overlap between the two systems.
+
+**This mismatch is the unfinished work.** A glass stylesheet was dropped in but
+the components were never migrated to it.
+
+### Reconciliation decision (user-approved)
+
+Rebuild `globals.css` to **define the vocabulary the components already
+reference** (`--bg`, `--card`, `--sidebar`, `--border`, `--r-*`, `.card`,
+`.nav-item`, `.btn-primary`, `.progress-track`, `ring-fill`, `.scalein`, …)
+using **g-assist-pro's `dark-glass` values**. Because the components already
+reference a complete, well-named vocabulary, defining it correctly makes them
+render as glass with **near-zero JSX change**. The currently-unused classes
+(`.glass`, `.cta`, `.option-btn`, `.step-card-*`, `.xp-pill`, `.streak-pill`)
+are removed to leave one coherent system. This replaces the original spec's
+assumption that the classes existed and merely needed restyling.
+
 ## Approach (chosen: B — extract a momentum engine, keep the shell)
 
 - New mechanics live as **pure functions** in `lib/momentum.js` (independently
@@ -77,10 +116,21 @@ its module color, matching current `mod.color` behavior in `LessonViewer`.
 - `.glass-card` — same recipe at `--gap-glass-2` (more opaque) + brighter inset
   highlight. Replaces the current `.card` / `.card-2`.
 
-Existing classes (`.btn-primary`, `.btn-ghost`, `.badge*`, `.nav-item`,
-`.progress-track/fill`, `.section-label`, `.fadein/scalein`) are **restyled** to
-sit on glass (translucent fills, accent = cyan or `--mod-color`), not removed —
-so component JSX keeps working with minimal churn.
+The full component vocabulary (`.card`, `.card-2`, `.card-btn`, `.btn-primary`,
+`.btn-ghost`, `.nav-item`+`.active`, `.nav-dot`, `.section-label`, `.divider`,
+`.progress-track`/`.progress-fill`, `.badge*`, `.fadein`, `.scalein`) and the
+structural tokens (`--bg`, `--card`, `--card-2`, `--card-hover`, `--sidebar`,
+`--sidebar-w`, `--border`, `--border-2`, `--r-sm/-md/-lg/-xl`, `--gold-dim`,
+`--blue-dim`, `--blue-ring`, `--green-dim`, `--green-ring`, `--red-dim`,
+`--shadow-2`) plus the `ring-fill` keyframe are **created** in `globals.css`
+mapped to g-assist-pro glass values:
+`--bg` → the navy gradient; `--card`/`--card-2`/`--card-hover` → glass-1/2/3
+fills with backdrop-blur; `--sidebar` → darker navy glass; `--border`/`--border-2`
+→ white-12% / white-20%; `--r-md` → `--gap-radius` (0.875rem). Because the JSX
+already references these exact names, defining them is what makes the app render
+as glass — JSX changes are limited to removing the one hardcoded
+`rgba(13,17,23,0.92)` sticky-header color in `LessonViewer.js` (→ translucent
+navy glass).
 
 ### Typography
 
