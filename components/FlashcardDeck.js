@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, Check, RotateCcw } from "lucide-react";
+import { useProgress } from "./ProgressContext";
 
-export default function FlashcardDeck({ cards, progress, onBack, onUpdate }) {
+export default function FlashcardDeck({ cards, progress, onBack }) {
+  const { masterCard } = useProgress();
   const [idx, setIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [known, setKnown] = useState({ ...progress.flashDone });
@@ -18,7 +20,7 @@ export default function FlashcardDeck({ cards, progress, onBack, onUpdate }) {
     const gi   = cards.indexOf(card);
     const next = { ...known, [gi]: true };
     setKnown(next);
-    onUpdate({ ...progress, flashDone: next });
+    masterCard(gi);
     setFlipped(false);
     setIdx(i => (i >= deck.length - 1 ? 0 : i + 1));
   }

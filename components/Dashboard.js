@@ -54,7 +54,7 @@ function DashboardInner() {
         view={view} activeModule={activeModule}
         onNav={(v, m) => { setView(v); if (m) setActiveModule(m); }}>
         <FlashcardDeck cards={FLASHCARDS} progress={progress}
-          onBack={() => setView("home")} onUpdate={() => {}} />
+          onBack={() => setView("home")} />
       </AppShell>
     );
   }
