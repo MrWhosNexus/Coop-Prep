@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   LayoutDashboard, CreditCard, ChevronRight, BookOpen,
   Zap, Flame, CalendarDays, Target, CheckCircle2,
@@ -12,6 +12,7 @@ import LessonViewer from "./LessonViewer";
 import FlashcardDeck from "./FlashcardDeck";
 import { ProgressProvider, useProgress } from "./ProgressContext";
 import MomentumStrip from "./MomentumStrip";
+import RewardLayer from "./RewardLayer";
 
 /* ─────────────────────────────────────────── */
 /*  Root                                       */
@@ -559,7 +560,7 @@ export default function Dashboard() {
   return (
     <ProgressProvider>
       <DashboardInner />
-      {/* RewardLayer mounted in Task 6 */}
+      <RewardLayer />
     </ProgressProvider>
   );
 }
