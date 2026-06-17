@@ -1,0 +1,247 @@
+@import "tailwindcss";
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* Glassmorphism surfaces */
+  --glass-xs:   rgba(255,255,255,0.05);
+  --glass-sm:   rgba(255,255,255,0.08);
+  --glass-md:   rgba(255,255,255,0.12);
+  --glass-lg:   rgba(255,255,255,0.18);
+  --glass-bd:   rgba(255,255,255,0.14);  /* border default */
+  --glass-bd-s: rgba(255,255,255,0.25);  /* border strong */
+
+  /* Accent palette */
+  --violet:  #7c3aed;
+  --violet-2:#a78bfa;
+  --blue:    #3b82f6;
+  --blue-2:  #60a5fa;
+  --gold:    #f59e0b;
+  --gold-2:  #fcd34d;
+  --green:   #22c55e;
+  --green-2: #4ade80;
+  --red:     #f87171;
+  --teal:    #2dd4bf;
+  --orange:  #f97316;
+
+  /* Text */
+  --text:    #f0f4ff;
+  --text-2:  #a8b8d8;
+  --text-3:  #6478a0;
+
+  /* Shadows */
+  --sh-sm: 0 2px 12px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3);
+  --sh-md: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.35);
+  --sh-lg: 0 20px 60px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.4);
+}
+
+html { font-size: 16px; height: 100%; }
+
+/* ─── Vivid background — the secret to good glassmorphism ─── */
+body {
+  min-height: 100%;
+  background:
+    radial-gradient(ellipse 900px 750px at -8% -5%, rgba(124,58,237,0.60) 0%, transparent 60%),
+    radial-gradient(ellipse 750px 650px at 108% 108%, rgba(37,99,235,0.50) 0%, transparent 60%),
+    radial-gradient(ellipse 600px 500px at 78% -12%, rgba(245,158,11,0.22) 0%, transparent 55%),
+    radial-gradient(ellipse 500px 400px at 20% 100%, rgba(124,58,237,0.25) 0%, transparent 55%),
+    linear-gradient(160deg, #0a0418 0%, #100627 45%, #0b1240 100%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Glass cards — HIGH contrast with background ─── */
+.glass {
+  background: var(--glass-sm);
+  backdrop-filter: blur(40px) saturate(200%) brightness(1.05);
+  -webkit-backdrop-filter: blur(40px) saturate(200%) brightness(1.05);
+  border: 1px solid var(--glass-bd);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.18),
+    var(--sh-sm);
+}
+.glass-md {
+  background: var(--glass-md);
+  backdrop-filter: blur(48px) saturate(220%) brightness(1.08);
+  -webkit-backdrop-filter: blur(48px) saturate(220%) brightness(1.08);
+  border: 1px solid var(--glass-bd-s);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255,255,255,0.22),
+    var(--sh-md);
+}
+
+/* Interactive glass */
+.glass-btn {
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s ease, border-color 0.18s ease;
+}
+.glass-btn:hover {
+  background: var(--glass-md);
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: inset 0 1.5px 0 rgba(255,255,255,0.22), var(--sh-md);
+}
+.glass-btn:active { transform: translateY(0) scale(0.995); }
+
+/* ─── XP / Streak pill ─── */
+.xp-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 100px;
+  font-size: 12.5px; font-weight: 700;
+  background: rgba(245,158,11,0.18);
+  color: var(--gold-2);
+  border: 1px solid rgba(245,158,11,0.35);
+}
+.streak-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 100px;
+  font-size: 12.5px; font-weight: 700;
+  background: rgba(249,115,22,0.18);
+  color: #fb923c;
+  border: 1px solid rgba(249,115,22,0.35);
+}
+
+/* ─── Step type cards (lesson viewer) ─── */
+.step-card-info     { border-left: 3px solid var(--blue-2); }
+.step-card-key-term { border-left: 3px solid var(--violet-2); }
+.step-card-stat     { border-left: 3px solid var(--gold); }
+.step-card-tip      { border-left: 3px solid var(--green); }
+.step-card-example  { border-left: 3px solid var(--teal); }
+
+/* Option buttons for quiz steps */
+.option-btn {
+  width: 100%; text-align: left; padding: 14px 18px;
+  border-radius: 14px; font-size: 14.5px; font-weight: 500;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.12);
+  color: var(--text-2); cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, color 0.14s, transform 0.14s;
+}
+.option-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.28);
+  color: var(--text);
+  transform: translateX(3px);
+}
+.option-btn.selected {
+  background: rgba(59,130,246,0.18);
+  border-color: rgba(59,130,246,0.55);
+  color: var(--blue-2);
+}
+.option-btn.correct {
+  background: rgba(34,197,94,0.18);
+  border-color: rgba(34,197,94,0.55);
+  color: var(--green-2);
+}
+.option-btn.wrong {
+  background: rgba(248,113,113,0.15);
+  border-color: rgba(248,113,113,0.45);
+  color: var(--red);
+}
+
+/* ─── Primary CTA ─── */
+.cta {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 32px; border-radius: 14px;
+  font-size: 15px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, var(--blue) 0%, var(--violet) 100%);
+  border: none; cursor: pointer;
+  box-shadow: 0 4px 20px rgba(59,130,246,0.4), 0 1px 4px rgba(0,0,0,0.2);
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+}
+.cta:hover  { opacity: 0.92; transform: translateY(-1px); box-shadow: 0 6px 28px rgba(59,130,246,0.5); }
+.cta:active { opacity: 1; transform: translateY(0); }
+.cta:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+.cta-green {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  box-shadow: 0 4px 20px rgba(34,197,94,0.4);
+}
+.cta-gold {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  box-shadow: 0 4px 20px rgba(245,158,11,0.4);
+}
+
+/* ─── Progress bar ─── */
+.prog-track {
+  height: 6px; width: 100%;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px; overflow: hidden;
+}
+.prog-fill {
+  height: 100%; border-radius: 3px;
+  transition: width 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* ─── Badge ─── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
+}
+.badge-violet { background: rgba(124,58,237,0.2); color: var(--violet-2); border: 1px solid rgba(124,58,237,0.4); }
+.badge-blue   { background: rgba(59,130,246,0.18); color: var(--blue-2);  border: 1px solid rgba(59,130,246,0.4); }
+.badge-gold   { background: rgba(245,158,11,0.18); color: var(--gold-2);  border: 1px solid rgba(245,158,11,0.4); }
+.badge-green  { background: rgba(34,197,94,0.18);  color: var(--green-2); border: 1px solid rgba(34,197,94,0.4); }
+.badge-muted  { background: rgba(255,255,255,0.07); color: var(--text-2); border: 1px solid rgba(255,255,255,0.15); }
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+/* ─── Focus ─── */
+*:focus-visible { outline: 2px solid rgba(96,165,250,0.6); outline-offset: 2px; border-radius: 8px; }
+
+/* ─── Animations ─── */
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes stepIn {
+  from { opacity: 0; transform: translateX(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes popIn {
+  0%   { opacity: 0; transform: scale(0.7); }
+  70%  { transform: scale(1.06); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes celebrate {
+  0%   { transform: scale(0); opacity: 0; }
+  50%  { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100px) rotate(360deg); opacity: 0; }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0.4); }
+  70%  { box-shadow: 0 0 0 14px rgba(59,130,246,0); }
+  100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+}
+
+.fadein   { animation: fadein  0.35s cubic-bezier(0.16,1,0.3,1) both; }
+.stepIn   { animation: stepIn  0.32s cubic-bezier(0.16,1,0.3,1) both; }
+.popIn    { animation: popIn   0.4s  cubic-bezier(0.16,1,0.3,1) both; }
+.celebrate { animation: celebrate 0.5s cubic-bezier(0.16,1,0.3,1) both; }
+.pulse-ring { animation: pulse-ring 1.5s infinite; }
+
+.shimmer-bg {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
