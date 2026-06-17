@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useProgress } from "@/components/ProgressContext";
 import { LayoutDashboard, BookOpen, CreditCard } from "lucide-react";
 import MobileHome from "./MobileHome";
+import MobileModules from "./MobileModules";
 
 export default function MobileApp() {
   const { progress } = useProgress();
@@ -24,7 +25,11 @@ export default function MobileApp() {
   let body;
   if (view === "home") body = <MobileHome onOpenLesson={(m, l) => { setActiveModule(m); setActiveLesson(l); setView("lesson"); }} onGoModules={() => setView("modules")} />;
   else if (view === "flash") body = <div className="card" style={{ padding: 20 }}>Flashcards (Task 6)</div>;
-  else body = <div className="card" style={{ padding: 20 }}>Modules (Task 4/5)</div>;
+  else body = <MobileModules
+    activeModule={view === "modules" ? activeModule : null}
+    onOpenModule={(m) => setActiveModule(m)}
+    onOpenLesson={(m, l) => { setActiveModule(m); setActiveLesson(l); setView("lesson"); }}
+    onBack={() => setActiveModule(null)} />;
 
   const TABS = [
     { id: "home",   label: "Home",       icon: LayoutDashboard },
