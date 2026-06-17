@@ -33,7 +33,7 @@ export default function LessonViewer({ lesson, mod, progress, onBack, onComplete
       {/* ── Sticky header ── */}
       <div style={{
         position: "sticky", top: 0, zIndex: 20,
-        background: "rgba(13,17,23,0.92)",
+        background: "rgba(13,17,23,0.6)",
         backdropFilter: "blur(16px) saturate(150%)",
         borderBottom: "1px solid var(--border)",
         padding: "0 32px",

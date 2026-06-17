@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useProgress } from "./ProgressContext";
 import { ACHIEVEMENTS } from "@/lib/momentum";
-import { Award, Zap, TrendingUp } from "lucide-react";
+import { Award, TrendingUp } from "lucide-react";
 
 export default function RewardLayer() {
   const { rewards, dismissReward } = useProgress();
