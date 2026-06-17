@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   LayoutDashboard, CreditCard, ChevronRight, BookOpen,
   Zap, Flame, CalendarDays, Target, CheckCircle2,
@@ -8,35 +8,24 @@ import {
   TrendingUp, CircleCheck
 } from "lucide-react";
 import { MODULES, FLASHCARDS } from "@/data/curriculum";
-import {
-  loadProgress, saveProgress, markComplete,
-  saveQuizScore, daysUntilFellowship, readinessScore
-} from "@/lib/progress";
 import LessonViewer from "./LessonViewer";
 import FlashcardDeck from "./FlashcardDeck";
+import { ProgressProvider, useProgress } from "./ProgressContext";
+import MomentumStrip from "./MomentumStrip";
+import RewardLayer from "./RewardLayer";
+import FocusTimer from "./FocusTimer";
 
 /* ─────────────────────────────────────────── */
 /*  Root                                       */
 /* ─────────────────────────────────────────── */
-export default function Dashboard() {
-  const [progress, setProgress] = useState(null);
+function DashboardInner() {
+  const { progress, days, readiness, completeLesson, recordQuiz } = useProgress();
   const [view, setView] = useState("home");          // home | module | lesson | flash
   const [activeModule, setActiveModule] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
-  const [days, setDays] = useState(0);
 
-  useEffect(() => {
-    setProgress(loadProgress());
-    setDays(daysUntilFellowship());
-  }, []);
-
-  function update(next) { setProgress(next); saveProgress(next); }
-  function onComplete(id) { update(markComplete(progress, id, 50)); }
-  function onQuizDone(id, correct, total) {
-    let next = saveQuizScore(progress, id, correct, total);
-    if (correct === total) next = { ...next, xp: next.xp + 25 };
-    update(next);
-  }
+  const onComplete = (id) => completeLesson(id);
+  const onQuizDone = (id, correct, total) => recordQuiz(id, correct, total);
 
   if (!progress) {
     return (
@@ -46,8 +35,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  const readiness = readinessScore(progress, MODULES);
 
   /* Full-screen views (lesson / flashcard) */
   if (view === "lesson" && activeLesson) {
@@ -67,7 +54,7 @@ export default function Dashboard() {
         view={view} activeModule={activeModule}
         onNav={(v, m) => { setView(v); if (m) setActiveModule(m); }}>
         <FlashcardDeck cards={FLASHCARDS} progress={progress}
-          onBack={() => setView("home")} onUpdate={update} />
+          onBack={() => setView("home")} />
       </AppShell>
     );
   }
@@ -229,6 +216,9 @@ function AppShell({ progress, days, readiness, view, activeModule, onNav, childr
               <span style={{ fontSize: 11, color: "var(--text-3)" }}>day</span>
             </div>
           </div>
+
+          {/* Focus Timer */}
+          <FocusTimer />
         </div>
       </aside>
 
@@ -271,6 +261,8 @@ function HomeView({ progress, days, readiness, onOpenModule, onOpenLesson, onFla
 
   return (
     <div style={{ padding: "40px 48px", maxWidth: 900, margin: "0 auto" }}>
+
+      <MomentumStrip />
 
       {/* Page header */}
       <div className="fadein" style={{ marginBottom: 36 }}>
@@ -562,5 +554,17 @@ function ModuleView({ mod, progress, onBack, onOpen }) {
         })}
       </div>
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────── */
+/*  Provider wrapper (default export)          */
+/* ─────────────────────────────────────────── */
+export default function Dashboard() {
+  return (
+    <ProgressProvider>
+      <DashboardInner />
+      <RewardLayer />
+    </ProgressProvider>
   );
 }
