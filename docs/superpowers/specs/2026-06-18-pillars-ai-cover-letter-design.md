@@ -68,7 +68,8 @@ export const PILLARS = [
 - All existing `MODULES` are mapped to `{ pillarId: 'head', kind: 'module', order: <curriculum index> }`.
 - Tools self-declare, e.g. the Cover Letter tool exports
   `{ id: 'coverLetter', kind: 'tool', pillarId: 'hustle', order: 1, label: 'Cover Letter Builder', component: CoverLetterTool }`.
-- Sidebar render per pillar: `registry.filter(x => x.pillarId === p.id).sort(byOrder)`.
+- Sidebar render per pillar: `registry.filter(x => x.pillarId === p.id).sort((a, b) => a.order - b.order)`
+  (numeric comparator — never a lexicographic sort on a string key, which breaks at 10+ items).
 - Empty pillars (Heart) render a quiet "Coming soon" stub.
 
 **View routing:** add `view: 'tool'` + `activeToolId` to `Dashboard.js`. The tool branch
@@ -121,17 +122,20 @@ gamification is deferred until the pillar has more than one tool.
 
 ### 5.1 Return contract (verbatim — tests and UI both target this)
 ```js
-// success
+// success (no warning)
 { ok: true, text: string }
+// success WITH a non-fatal warning (the ONLY case where ok:true carries a warning)
+{ ok: true, text: string, warning: { type: 'TOKEN_LIMIT' } }   // prompt was truncated; text still valid
 // failure
 { ok: false, error: { type, ...extra } }
-//   type: 'NO_KEY'                          -> hasAIKey() false; render structured fallback silently
-//   type: 'NETWORK_ERROR'                   -> fetch threw; render structured fallback + offline note
-//   type: 'API_ERROR', status, message      -> 4xx/5xx from provider; show inline error, never crash
-//   type: 'TOKEN_LIMIT'                     -> NON-FATAL: prompt was truncated; `text` is still returned
+//   type: 'NO_KEY'                       -> hasAIKey() false; render structured fallback silently
+//   type: 'NETWORK_ERROR'                -> fetch threw; render structured fallback + offline note
+//   type: 'API_ERROR', status, message   -> 4xx/5xx from provider; show inline error, never crash
 ```
-Tools switch on `error.type`: `NO_KEY` / `NETWORK_ERROR` → structured fallback silently;
-`API_ERROR` → inline message; `TOKEN_LIMIT` accompanies a successful `text` with a subtle
+`TOKEN_LIMIT` is **not** a failure: the call succeeded and `text` is returned, so it lives on
+the `ok: true` shape as an optional `warning`, never under `ok: false`. Tools branch as:
+`ok:false` + `NO_KEY`/`NETWORK_ERROR` → structured fallback silently; `ok:false` + `API_ERROR`
+→ inline message; `ok:true` + `warning.type === 'TOKEN_LIMIT'` → render `text` with a subtle
 "trimmed for length" note.
 
 ### 5.2 Settings (`components/Settings.js`, reachable via a gear in the sidebar footer)
@@ -206,7 +210,9 @@ Tools switch on `error.type`: `NO_KEY` / `NETWORK_ERROR` → structured fallback
 
 `test/ai.test.js`:
 - `fillPrompt`: slot replacement; missing-slot guard (never `undefined`); `estimateTokens`;
-  longest-slot truncation past the guard.
+  longest-slot truncation past the guard. When truncation fires, `callLLM` returns
+  `{ ok: true, text, warning: { type: 'TOKEN_LIMIT' } }` (assert the `ok:true`+`warning` shape,
+  not an `ok:false` error).
 - `sanitizeResponse`: strips `<script>`, executable fences, control chars; preserves prose.
 - `config`: get/set round-trip; `hasAIKey()` true/false (localStorage injected).
 - `client.callLLM` (injected `fetch`): `NO_KEY` when no key; `NETWORK_ERROR` on throw;
