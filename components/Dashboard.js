@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as lib from "@/lib/coop-lib";
+import ToolErrorBoundary from "@/components/ToolErrorBoundary";
+import Settings from "@/components/Settings";
+import CoverLetterTool from "@/components/tools/CoverLetterTool";
+const TOOL_COMPONENTS = { coverLetter: CoverLetterTool };
 
 /* ──────────────────────────────────────────────────────────────────────
    Ported from the "COOP Prep" Claude Design component (COOP Prep.dc.html).
@@ -40,6 +44,10 @@ const ICONS = {
   trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
   highlighter: '<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>',
   note: '<path d="M15 3v4a2 2 0 0 0 2 2h4"/><path d="M5 3h10l6 6v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>',
+  brain: '<path d="M12 5a3 3 0 1 0-5.997.142 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.142 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/>',
+  heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+  briefcase: '<rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
 };
 
 // Split `text` into nodes, wrapping any saved highlight snippet in <mark>.
@@ -102,6 +110,9 @@ export default function Dashboard() {
   const [focusRunning, setFocusRunning] = useState(false);
   const [focusSeconds, setFocusSeconds] = useState(0);
 
+  const [activeToolId, setActiveToolId] = useState(null);
+  const [aiOn, setAiOn] = useState(false);
+
   const focusInt = useRef(null);
   const timers = useRef([]);
 
@@ -112,6 +123,7 @@ export default function Dashboard() {
     document.documentElement.setAttribute("data-theme", t);
     setTheme(t);
     setProgress(lib.loadProgress());
+    setAiOn(lib.hasAIKey());
     setDays(lib.daysUntilFellowship());
     return () => {
       if (focusInt.current) clearInterval(focusInt.current);
@@ -160,6 +172,8 @@ export default function Dashboard() {
     if (moduleId !== undefined) setActiveModuleId(moduleId);
   }
   function openModule(id) { setView("module"); setActiveModuleId(id); }
+  function openTool(id) { setView("tool"); setActiveToolId(id); }
+  function dispatchTool(newState) { setProgress(newState); lib.saveProgress(newState); }
   function openLesson(modId, lessonId) {
     setView("lesson");
     setActiveModuleId(modId);
@@ -298,17 +312,37 @@ export default function Dashboard() {
                 <Icon name="dashboard" size={15} /><span>Dashboard</span>
               </button>
 
-              <div style={{ margin: "16px 0 6px", padding: "0 10px" }}><span className="section-label">Curriculum</span></div>
-              {MODULES.map((mod) => {
-                const total = mod.lessons.length;
-                const done = mod.lessons.filter((l) => progress.completed[l.id]).length;
-                const active = (view === "module" || view === "lesson") && activeModuleId === mod.id;
+              {lib.PILLARS.map((p) => {
+                const items = lib.getByPillar(p.id);
                 return (
-                  <button key={mod.id} className={active ? "nav-item active" : "nav-item"} onClick={() => openModule(mod.id)} style={{ paddingLeft: 11 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: active ? "var(--primary)" : mod.color, opacity: active ? 1 : 0.75 }} />
-                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{mod.title}</span>
-                    <span className="mono" style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 600 }}>{done}/{total}</span>
-                  </button>
+                  <div key={p.id}>
+                    <div style={{ margin: "16px 0 6px", padding: "0 10px", display: "flex", alignItems: "center", gap: 6 }}>
+                      <Icon name={p.icon} size={13} color="var(--text-3)" />
+                      <span className="section-label">{p.label}</span>
+                    </div>
+                    {items.length === 0 && (
+                      <div style={{ padding: "4px 11px", fontSize: 12, color: "var(--text-3)" }}>Coming soon</div>
+                    )}
+                    {items.map((it) => {
+                      if (it.kind === "module") {
+                        const mod = MODULES.find((m) => m.id === it.id);
+                        const active = (view === "module" || view === "lesson") && activeModuleId === it.id;
+                        return (
+                          <button key={it.id} className={active ? "nav-item active" : "nav-item"} onClick={() => openModule(it.id)} style={{ paddingLeft: 11 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 4, background: mod ? mod.color : "var(--text-3)", flexShrink: 0 }} />
+                            <span>{it.label}</span>
+                          </button>
+                        );
+                      }
+                      const active = view === "tool" && activeToolId === it.id;
+                      return (
+                        <button key={it.id} className={active ? "nav-item active" : "nav-item"} onClick={() => openTool(it.id)} style={{ paddingLeft: 11 }}>
+                          <Icon name="note" size={15} />
+                          <span>{it.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 );
               })}
 
@@ -358,6 +392,11 @@ export default function Dashboard() {
                 </span>
                 <span className="mono" style={{ fontSize: 12, color: focusRunning ? "var(--text-1)" : "var(--text-3)" }}>{lib.formatDuration(focusSeconds)}</span>
               </button>
+              <button className="nav-item" onClick={() => setView("settings")} style={{ marginTop: 8 }}>
+                <Icon name="settings" size={15} />
+                <span>AI Settings</span>
+                {aiOn && <span className="badge badge-green" style={{ marginLeft: "auto" }}>AI</span>}
+              </button>
             </div>
           </div>
         </aside>
@@ -384,6 +423,16 @@ export default function Dashboard() {
           )}
           {view === "saved" && (
             <SavedView {...{ MODULES, progress, openLesson, toggleBookmark, removeHighlight }} />
+          )}
+          {view === "tool" && (
+            <ToolErrorBoundary toolId={activeToolId}>
+              {TOOL_COMPONENTS[activeToolId]
+                ? (() => { const T = TOOL_COMPONENTS[activeToolId]; return <T state={progress} dispatch={dispatchTool} onOpenSettings={() => setView("settings")} />; })()
+                : <div className="glass" style={{ padding: 24, maxWidth: 720, margin: "40px auto" }}>Coming soon.</div>}
+            </ToolErrorBoundary>
+          )}
+          {view === "settings" && (
+            <Settings onClose={() => setView("home")} onSaved={() => setAiOn(lib.hasAIKey())} />
           )}
         </main>
       </div>
