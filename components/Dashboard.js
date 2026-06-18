@@ -34,7 +34,30 @@ const ICONS = {
   award: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  bookmark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+  highlighter: '<path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/>',
+  note: '<path d="M15 3v4a2 2 0 0 0 2 2h4"/><path d="M5 3h10l6 6v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/>',
 };
+
+// Split `text` into nodes, wrapping any saved highlight snippet in <mark>.
+function HighlightedText({ text, snippets, color }) {
+  if (!snippets || !snippets.length) return text;
+  const present = snippets.filter((s) => s && text.includes(s)).sort((a, b) => b.length - a.length);
+  if (!present.length) return text;
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`(${present.map(esc).join("|")})`, "g");
+  const parts = text.split(re);
+  return parts.map((part, i) =>
+    present.includes(part) ? (
+      <mark key={i} style={{ background: hexA(color, 0.28), color: "var(--text-1)", borderRadius: 3, padding: "0 2px", boxDecorationBreak: "clone", WebkitBoxDecorationBreak: "clone" }}>{part}</mark>
+    ) : (
+      part
+    )
+  );
+}
 
 function Icon({ name, size = 16, color = "currentColor", fill = "none", style }) {
   return (
@@ -68,6 +91,9 @@ export default function Dashboard() {
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
+
+  const [query, setQuery] = useState("");
+  const [selText, setSelText] = useState("");
 
   const [flashIdx, setFlashIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -116,6 +142,18 @@ export default function Dashboard() {
   const masterCard = (idx) => applyResult(lib.doMasterCard(progress, idx));
   const addFocus = (min) => applyResult(lib.doAddFocusMinutes(progress, min));
 
+  /* ── study tools (persist immediately; no rewards) ── */
+  function persist(next) { lib.saveProgress(next); setProgress(next); }
+  const toggleBookmark = (id) => persist(lib.toggleBookmark(progress, id));
+  function saveHighlight() {
+    const t = selText.trim();
+    if (!t || !activeLessonId) return;
+    persist(lib.addHighlight(progress, activeLessonId, t));
+    setSelText("");
+    try { window.getSelection()?.removeAllRanges(); } catch {}
+  }
+  const removeHighlight = (id, text) => persist(lib.removeHighlight(progress, id, text));
+
   /* ── navigation ── */
   function go(v, moduleId) {
     setView(v);
@@ -129,7 +167,14 @@ export default function Dashboard() {
     setLessonTab("read");
     setAnswers({});
     setSubmitted(false);
+    setSelText("");
     setNoteDraft(progress?.notes?.[lessonId] || "");
+  }
+  function openCard(index) {
+    setFlashMode("all");
+    setFlashIdx(index);
+    setFlipped(false);
+    setView("flash");
   }
   function toggleTheme() {
     const next = theme === "daylight" ? "midnight" : "daylight";
@@ -212,6 +257,10 @@ export default function Dashboard() {
   const doneLessons = allLessons.filter((l) => progress.completed[l.id]).length;
   const readiness = lib.readinessScore(progress, MODULES);
 
+  const bookmarkCount = Object.keys(progress.bookmarks || {}).length;
+  const highlightCount = Object.values(progress.highlights || {}).reduce((n, arr) => n + arr.length, 0);
+  const savedCount = bookmarkCount + highlightCount;
+
   // sidebar countdown urgency
   let cdBg, cdBorder, cdColor;
   if (days < 20) { cdBg = "var(--red-dim)"; cdBorder = "var(--red-ring)"; cdColor = "var(--red-2)"; }
@@ -268,6 +317,15 @@ export default function Dashboard() {
                 <Icon name="cards" size={15} /><span style={{ flex: 1 }}>Flashcards</span>
                 <span className="badge badge-muted" style={{ fontSize: 10 }}>{FLASHCARDS.length}</span>
               </button>
+
+              <div style={{ margin: "16px 0 6px", padding: "0 10px" }}><span className="section-label">Study</span></div>
+              <button className={view === "search" ? "nav-item active" : "nav-item"} onClick={() => go("search")}>
+                <Icon name="search" size={15} /><span>Search</span>
+              </button>
+              <button className={view === "saved" ? "nav-item active" : "nav-item"} onClick={() => go("saved")}>
+                <Icon name="bookmark" size={15} /><span style={{ flex: 1 }}>Saved</span>
+                {savedCount > 0 && <span className="badge badge-muted" style={{ fontSize: 10 }}>{savedCount}</span>}
+              </button>
             </nav>
 
             {/* footer */}
@@ -311,7 +369,8 @@ export default function Dashboard() {
           {view === "lesson" && (
             <LessonView
               {...{ MODULES, progress, activeModuleId, activeLessonId, lessonTab, setLessonTab,
-                answers, submitted, noteDraft, pickAnswer, submitQuiz, retryQuiz, onNote, completeLesson, go }}
+                answers, submitted, noteDraft, pickAnswer, submitQuiz, retryQuiz, onNote, completeLesson, go,
+                toggleBookmark, removeHighlight, setSelText }}
             />
           )}
           {view === "flash" && (
@@ -320,8 +379,23 @@ export default function Dashboard() {
                 chooseFlashMode, flip, navCard, markKnown, go }}
             />
           )}
+          {view === "search" && (
+            <SearchView {...{ MODULES, FLASHCARDS, progress, query, setQuery, openLesson, openCard }} />
+          )}
+          {view === "saved" && (
+            <SavedView {...{ MODULES, progress, openLesson, toggleBookmark, removeHighlight }} />
+          )}
         </main>
       </div>
+
+      {/* ══════════ HIGHLIGHT SELECTION PILL ══════════ */}
+      {view === "lesson" && lessonTab === "read" && selText && (
+        <div style={{ position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 70 }}>
+          <button className="glass-strong" onClick={saveHighlight} style={{ display: "flex", alignItems: "center", gap: 9, padding: "11px 20px", borderRadius: 999, cursor: "pointer", color: "var(--text-1)", fontSize: 13.5, fontWeight: 600, fontFamily: "var(--font-body)", boxShadow: "0 10px 30px rgba(0,0,0,0.22)" }}>
+            <Icon name="highlighter" size={15} color="var(--gold-2)" /> Highlight selection
+          </button>
+        </div>
+      )}
 
       {/* ══════════ REWARD LAYER ══════════ */}
       <div style={{ position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)", zIndex: 60, pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -584,12 +658,17 @@ function ModuleView({ MODULES, progress, activeModuleId, openLesson, go }) {
 }
 
 /* ─────────────────────────────────────────── LESSON ─────────────────────────────────────────── */
-function LessonView({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, setLessonTab, answers, submitted, noteDraft, pickAnswer, submitQuiz, retryQuiz, onNote, completeLesson, go }) {
+function LessonView({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, setLessonTab, answers, submitted, noteDraft, pickAnswer, submitQuiz, retryQuiz, onNote, completeLesson, go, toggleBookmark, removeHighlight, setSelText }) {
   const mod = MODULES.find((m) => m.id === activeModuleId);
   const lesson = mod && mod.lessons.find((l) => l.id === activeLessonId);
   if (!lesson) return null;
   const done = !!progress.completed[lesson.id];
   const quizScore = progress.quizScores[lesson.id];
+  const bookmarked = !!progress.bookmarks?.[lesson.id];
+  const highlights = progress.highlights?.[lesson.id] || [];
+  const captureSelection = () => {
+    try { setSelText((window.getSelection()?.toString() || "").trim()); } catch {}
+  };
 
   const tabDefs = [
     { id: "read", label: "Lesson", ic: "clock" },
@@ -611,6 +690,9 @@ function LessonView({ MODULES, progress, activeModuleId, activeLessonId, lessonT
               <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-1)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lesson.title}</div>
             </div>
             {done && <span className="badge badge-green" style={{ flexShrink: 0 }}><Icon name="check" size={10} color="var(--green-2)" />Done</span>}
+            <button onClick={() => toggleBookmark(lesson.id)} title={bookmarked ? "Remove bookmark" : "Bookmark this lesson"} aria-label="Toggle bookmark" style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 999, cursor: "pointer", border: `1px solid ${bookmarked ? "var(--gold-ring)" : "var(--glass-border)"}`, background: bookmarked ? "var(--gold-dim)" : "var(--glass-fill)" }}>
+              <Icon name="bookmark" size={15} color={bookmarked ? "var(--gold-2)" : "var(--text-3)"} fill={bookmarked ? "var(--gold-2)" : "none"} />
+            </button>
           </div>
           <div style={{ display: "flex", borderTop: "1px solid var(--glass-border)" }}>
             {tabDefs.map((t) => {
@@ -633,11 +715,33 @@ function LessonView({ MODULES, progress, activeModuleId, activeLessonId, lessonT
               <span className="badge badge-muted"><Icon name="clock" size={11} color="var(--text-3)" /> {lesson.minutes} min read</span>
               {done && <span className="badge badge-green"><Icon name="check" size={10} color="var(--green-2)" /> Completed</span>}
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            <div onMouseUp={captureSelection} onTouchEnd={captureSelection} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               {lesson.body.map((text, i) => (
-                <p key={i} style={{ fontSize: 15, lineHeight: 1.8, color: "var(--text-2)" }}>{text}</p>
+                <p key={i} style={{ fontSize: 15, lineHeight: 1.8, color: "var(--text-2)" }}>
+                  <HighlightedText text={text} snippets={highlights} color={mod.color} />
+                </p>
               ))}
             </div>
+
+            {highlights.length > 0 && (
+              <div style={{ marginTop: 32, paddingTop: 22, borderTop: "1px solid var(--glass-border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                  <Icon name="highlighter" size={14} color="var(--gold-2)" />
+                  <span className="section-label">Highlights ({highlights.length})</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {highlights.map((h) => (
+                    <div key={h} className="glass" style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 14px", borderLeft: `3px solid ${mod.color}` }}>
+                      <span style={{ flex: 1, fontSize: 13.5, color: "var(--text-2)", lineHeight: 1.5 }}>{h}</span>
+                      <button onClick={() => removeHighlight(lesson.id, h)} title="Remove highlight" aria-label="Remove highlight" style={{ flexShrink: 0, display: "flex", padding: 4, borderRadius: 6, border: "none", background: "none", cursor: "pointer", color: "var(--text-3)" }}>
+                        <Icon name="x" size={14} color="var(--text-3)" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-3)" }}>Select any text above and tap “Highlight selection” to save it here.</div>
+              </div>
+            )}
             <div style={{ marginTop: 40, paddingTop: 26, borderTop: "1px solid var(--glass-border)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
                 <div style={{ width: 3, height: 16, borderRadius: 2, background: mod.color }} />
@@ -806,6 +910,180 @@ function FlashView({ FLASHCARDS, progress, flashMode, flipped, flashIdx, flashDe
           <div className="progress-track" style={{ height: 6 }}><div className="progress-fill" style={{ width: `${(mastered / cards.length) * 100}%`, background: "linear-gradient(90deg, var(--green) 0%, var(--primary) 100%)" }} /></div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────── SEARCH ─────────────────────────────────────────── */
+function SearchView({ MODULES, FLASHCARDS, progress, query, setQuery, openLesson, openCard }) {
+  const results = lib.searchCurriculum(MODULES, FLASHCARDS, query);
+  const lessons = results.filter((r) => r.type === "lesson");
+  const cards = results.filter((r) => r.type === "flashcard");
+  const trimmed = query.trim();
+
+  return (
+    <div style={{ padding: "40px 48px", maxWidth: 740, margin: "0 auto" }}>
+      <h1 className="fadein" style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-1)", marginBottom: 18 }}>Search</h1>
+
+      <div className="glass fadein" style={{ display: "flex", alignItems: "center", gap: 12, padding: "4px 16px", marginBottom: 24 }}>
+        <Icon name="search" size={18} color="var(--text-3)" />
+        <input
+          autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search lessons, challenges, and flashcards…"
+          style={{ flex: 1, padding: "14px 0", background: "none", border: "none", outline: "none", color: "var(--text-1)", fontSize: 15, fontFamily: "var(--font-body)" }}
+        />
+        {query && (
+          <button onClick={() => setQuery("")} aria-label="Clear search" style={{ display: "flex", padding: 6, border: "none", background: "none", cursor: "pointer", color: "var(--text-3)" }}>
+            <Icon name="x" size={16} color="var(--text-3)" />
+          </button>
+        )}
+      </div>
+
+      {trimmed.length < 2 ? (
+        <div className="fadein" style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-3)", fontSize: 14 }}>Type at least two characters to search across every module.</div>
+      ) : results.length === 0 ? (
+        <div className="fadein" style={{ textAlign: "center", padding: "40px 20px", color: "var(--text-3)", fontSize: 14 }}>No matches for “{trimmed}”. Try a regulation, formula, or keyword.</div>
+      ) : (
+        <div className="fadein" style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          <div style={{ fontSize: 12.5, color: "var(--text-3)" }}>{results.length} result{results.length === 1 ? "" : "s"} for “{trimmed}”</div>
+
+          {lessons.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 10 }}><span className="section-label">Lessons ({lessons.length})</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {lessons.map((r) => (
+                  <button key={r.lessonId} className="glass glass-btn" onClick={() => openLesson(r.moduleId, r.lessonId)} style={{ display: "block", width: "100%", textAlign: "left", padding: "14px 18px", borderLeft: `3px solid ${r.color}` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: r.color }}>{r.moduleTitle}</span>
+                    </div>
+                    <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-1)", marginBottom: 4 }}>{r.title}</div>
+                    <div style={{ fontSize: 12.5, color: "var(--text-3)", lineHeight: 1.5 }}>{r.snippet}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {cards.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 10 }}><span className="section-label">Flashcards ({cards.length})</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {cards.map((r) => (
+                  <button key={r.index} className="glass glass-btn" onClick={() => openCard(r.index)} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left", padding: "14px 18px" }}>
+                    <Icon name="cards" size={17} color="var(--gold-2)" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)", marginBottom: 3 }}>{r.term}</div>
+                      <div style={{ fontSize: 12.5, color: "var(--text-3)", lineHeight: 1.5 }}>{r.snippet}</div>
+                    </div>
+                    <Icon name="chevR" size={15} color="var(--text-3)" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────── SAVED ─────────────────────────────────────────── */
+function SavedView({ MODULES, progress, openLesson, toggleBookmark, removeHighlight }) {
+  const lessonOf = (id) => {
+    for (const mod of MODULES) {
+      const l = mod.lessons.find((x) => x.id === id);
+      if (l) return { mod, lesson: l };
+    }
+    return null;
+  };
+
+  const bookmarks = Object.keys(progress.bookmarks || {}).map(lessonOf).filter(Boolean);
+  const highlightEntries = Object.entries(progress.highlights || {})
+    .map(([id, snippets]) => ({ ref: lessonOf(id), snippets }))
+    .filter((e) => e.ref && e.snippets.length);
+  const noteEntries = Object.entries(progress.notes || {})
+    .filter(([, v]) => v && v.trim())
+    .map(([id, text]) => ({ ref: lessonOf(id), text }))
+    .filter((e) => e.ref);
+
+  const empty = !bookmarks.length && !highlightEntries.length && !noteEntries.length;
+
+  return (
+    <div style={{ padding: "40px 48px", maxWidth: 740, margin: "0 auto" }}>
+      <h1 className="fadein" style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--text-1)", marginBottom: 6 }}>Saved</h1>
+      <p className="fadein" style={{ fontSize: 13.5, color: "var(--text-2)", marginBottom: 26 }}>Your bookmarks, highlights, and notes — all in one place.</p>
+
+      {empty ? (
+        <div className="glass fadein" style={{ textAlign: "center", padding: "44px 24px" }}>
+          <Icon name="bookmark" size={26} color="var(--text-3)" style={{ margin: "0 auto 12px" }} />
+          <div style={{ fontSize: 15, fontWeight: 600, color: "var(--text-1)", marginBottom: 6 }}>Nothing saved yet</div>
+          <div style={{ fontSize: 13, color: "var(--text-3)", lineHeight: 1.6 }}>Bookmark a lesson, highlight a sentence, or jot a note — they’ll collect here for quick review.</div>
+        </div>
+      ) : (
+        <div className="fadein" style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+
+          {bookmarks.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 12 }}><span className="section-label">Bookmarked lessons ({bookmarks.length})</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {bookmarks.map(({ mod, lesson }) => (
+                  <div key={lesson.id} className="glass" style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", borderLeft: `3px solid ${mod.color}` }}>
+                    <button onClick={() => openLesson(mod.id, lesson.id)} className="glass-btn" style={{ flex: 1, minWidth: 0, textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: mod.color, marginBottom: 4 }}>{mod.title}</div>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-1)" }}>{lesson.title}</div>
+                    </button>
+                    <button onClick={() => toggleBookmark(lesson.id)} title="Remove bookmark" aria-label="Remove bookmark" style={{ flexShrink: 0, display: "flex", padding: 7, borderRadius: 999, border: "1px solid var(--gold-ring)", background: "var(--gold-dim)", cursor: "pointer" }}>
+                      <Icon name="bookmark" size={14} color="var(--gold-2)" fill="var(--gold-2)" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {highlightEntries.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 12 }}><span className="section-label">Highlights</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {highlightEntries.map(({ ref, snippets }) => (
+                  <div key={ref.lesson.id}>
+                    <button onClick={() => openLesson(ref.mod.id, ref.lesson.id)} className="glass-btn" style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8, background: "none", border: "none", cursor: "pointer", padding: 0, color: ref.mod.color, fontSize: 12.5, fontWeight: 600 }}>
+                      {ref.lesson.title} <Icon name="chevR" size={13} color={ref.mod.color} />
+                    </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {snippets.map((h) => (
+                        <div key={h} className="glass" style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 14px", borderLeft: `3px solid ${ref.mod.color}` }}>
+                          <span style={{ flex: 1, fontSize: 13, color: "var(--text-2)", lineHeight: 1.5 }}>{h}</span>
+                          <button onClick={() => removeHighlight(ref.lesson.id, h)} title="Remove highlight" aria-label="Remove highlight" style={{ flexShrink: 0, display: "flex", padding: 4, border: "none", background: "none", cursor: "pointer", color: "var(--text-3)" }}>
+                            <Icon name="x" size={13} color="var(--text-3)" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {noteEntries.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 12 }}><span className="section-label">Notes</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {noteEntries.map(({ ref, text }) => (
+                  <button key={ref.lesson.id} className="glass glass-btn" onClick={() => openLesson(ref.mod.id, ref.lesson.id)} style={{ display: "block", width: "100%", textAlign: "left", padding: "14px 18px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                      <Icon name="note" size={13} color="var(--text-3)" />
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: ref.mod.color }}>{ref.lesson.title}</span>
+                    </div>
+                    <div style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, whiteSpace: "pre-wrap", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{text}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

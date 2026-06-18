@@ -5,6 +5,7 @@ import {
   ChevronRight, ChevronLeft, Clock, HelpCircle, Lock, CheckCircle2,
   Check, ArrowLeft, ArrowRight, Lightbulb, RotateCcw, Play, Square,
   TrendingUp, Award, Sun, Moon, CalendarDays,
+  Search, Bookmark, X, Highlighter, StickyNote,
 } from "lucide-react";
 
 /* Mobile port of the "COOP Prep" Claude Design UI — same light Liquid-Glass
@@ -15,6 +16,20 @@ function hexA(hex, a) {
   const h = hex.replace("#", "");
   const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+// Wrap any saved highlight snippet in <mark> within `text`.
+function HighlightedText({ text, snippets, color }) {
+  if (!snippets || !snippets.length) return text;
+  const present = snippets.filter((s) => s && text.includes(s)).sort((a, b) => b.length - a.length);
+  if (!present.length) return text;
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${present.map(esc).join("|")})`, "g"));
+  return parts.map((part, i) =>
+    present.includes(part)
+      ? <mark key={i} style={{ background: hexA(color, 0.28), color: "var(--text-1)", borderRadius: 3, padding: "0 2px" }}>{part}</mark>
+      : part
+  );
 }
 
 export default function MobileApp() {
@@ -32,6 +47,9 @@ export default function MobileApp() {
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
+
+  const [query, setQuery] = useState("");
+  const [selText, setSelText] = useState("");
 
   const [flashIdx, setFlashIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -76,14 +94,27 @@ export default function MobileApp() {
   const masterCard = (idx) => applyResult(lib.doMasterCard(progress, idx));
   const addFocus = (min) => applyResult(lib.doAddFocusMinutes(progress, min));
 
+  /* study tools (persist immediately) */
+  function persist(next) { lib.saveProgress(next); setProgress(next); }
+  const toggleBookmark = (id) => persist(lib.toggleBookmark(progress, id));
+  function saveHighlight() {
+    const t = selText.trim();
+    if (!t || !activeLessonId) return;
+    persist(lib.addHighlight(progress, activeLessonId, t));
+    setSelText("");
+    try { window.getSelection()?.removeAllRanges(); } catch {}
+  }
+  const removeHighlight = (id, text) => persist(lib.removeHighlight(progress, id, text));
+
   /* nav */
   function openModule(id) { setView("modules"); setActiveModuleId(id); }
   function openLesson(modId, lessonId) {
     setView("lesson"); setActiveModuleId(modId); setActiveLessonId(lessonId);
-    setLessonTab("read"); setAnswers({}); setSubmitted(false);
+    setLessonTab("read"); setAnswers({}); setSubmitted(false); setSelText("");
     setNoteDraft(progress?.notes?.[lessonId] || "");
     window.scrollTo(0, 0);
   }
+  function openCard(index) { setFlashMode("all"); setFlashIdx(index); setFlipped(false); setView("flash"); window.scrollTo(0, 0); }
   function goTab(id) { setView(id); setActiveModuleId(null); setActiveLessonId(null); window.scrollTo(0, 0); }
   function toggleTheme() {
     const next = theme === "daylight" ? "midnight" : "daylight";
@@ -167,7 +198,9 @@ export default function MobileApp() {
   const TABS = [
     { id: "home", label: "Home", Icon: LayoutDashboard },
     { id: "modules", label: "Modules", Icon: BookOpen },
-    { id: "flash", label: "Flashcards", Icon: CreditCard },
+    { id: "flash", label: "Cards", Icon: CreditCard },
+    { id: "search", label: "Search", Icon: Search },
+    { id: "saved", label: "Saved", Icon: Bookmark },
   ];
 
   return (
@@ -194,10 +227,17 @@ export default function MobileApp() {
         )}
         {view === "lesson" && (
           <Lesson {...{ MODULES, progress, activeModuleId, activeLessonId, lessonTab, setLessonTab,
-            answers, submitted, noteDraft, pickAnswer, submitQuiz, retryQuiz, onNote, completeLesson, setView }} />
+            answers, submitted, noteDraft, pickAnswer, submitQuiz, retryQuiz, onNote, completeLesson, setView,
+            toggleBookmark, removeHighlight, setSelText }} />
         )}
         {view === "flash" && (
           <Flash {...{ FLASHCARDS, progress, flashMode, flipped, flashIdx, flashDeck, chooseFlashMode, flip, navCard, markKnown, goTab }} />
+        )}
+        {view === "search" && (
+          <SearchTab {...{ MODULES, FLASHCARDS, query, setQuery, openLesson, openCard }} />
+        )}
+        {view === "saved" && (
+          <SavedTab {...{ MODULES, progress, openLesson, toggleBookmark, removeHighlight }} />
         )}
       </div>
 
@@ -208,6 +248,15 @@ export default function MobileApp() {
           </button>
         ))}
       </nav>
+
+      {/* highlight selection pill */}
+      {view === "lesson" && lessonTab === "read" && selText && (
+        <div style={{ position: "fixed", bottom: "calc(env(safe-area-inset-bottom) + 76px)", left: "50%", transform: "translateX(-50%)", zIndex: 70 }}>
+          <button className="glass-strong" onClick={saveHighlight} style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 20px", borderRadius: 999, cursor: "pointer", color: "var(--text-1)", fontSize: 13.5, fontWeight: 600, fontFamily: "var(--font-body)", boxShadow: "0 10px 30px rgba(0,0,0,0.22)" }}>
+            <Highlighter size={15} style={{ color: "var(--gold-2)" }} /> Highlight
+          </button>
+        </div>
+      )}
 
       {/* reward layer */}
       <div style={{ position: "fixed", bottom: 96, left: "50%", transform: "translateX(-50%)", zIndex: 60, pointerEvents: "none", display: "flex", flexDirection: "column", alignItems: "center" }}>
@@ -472,12 +521,17 @@ function Modules({ MODULES, progress, activeModuleId, openModule, openLesson, se
 }
 
 /* ─────────── Lesson ─────────── */
-function Lesson({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, setLessonTab, answers, submitted, noteDraft, pickAnswer, submitQuiz, retryQuiz, onNote, completeLesson, setView }) {
+function Lesson({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, setLessonTab, answers, submitted, noteDraft, pickAnswer, submitQuiz, retryQuiz, onNote, completeLesson, setView, toggleBookmark, removeHighlight, setSelText }) {
   const mod = MODULES.find((m) => m.id === activeModuleId);
   const lesson = mod && mod.lessons.find((l) => l.id === activeLessonId);
   if (!lesson) return null;
   const done = !!progress.completed[lesson.id];
   const quizScore = progress.quizScores[lesson.id];
+  const bookmarked = !!progress.bookmarks?.[lesson.id];
+  const highlights = progress.highlights?.[lesson.id] || [];
+  const captureSelection = () => {
+    try { setSelText((window.getSelection()?.toString() || "").trim()); } catch {}
+  };
   const correct = submitted ? lesson.quiz.filter((q, i) => answers[i] === q.a).length : 0;
   const allAnswered = (lesson.quiz || []).every((_, i) => answers[i] !== undefined);
 
@@ -496,6 +550,9 @@ function Lesson({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, 
           <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)", lineHeight: 1.2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{lesson.title}</div>
         </div>
         {done && <span className="badge badge-green" style={{ flexShrink: 0 }}><Check size={10} />Done</span>}
+        <button onClick={() => toggleBookmark(lesson.id)} aria-label="Toggle bookmark" style={{ flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 999, cursor: "pointer", border: `1px solid ${bookmarked ? "var(--gold-ring)" : "var(--glass-border)"}`, background: bookmarked ? "var(--gold-dim)" : "var(--glass-fill)" }}>
+          <Bookmark size={15} style={{ color: bookmarked ? "var(--gold-2)" : "var(--text-3)" }} fill={bookmarked ? "var(--gold-2)" : "none"} />
+        </button>
       </div>
 
       <div className="glass" style={{ display: "flex", padding: 4, gap: 2, marginBottom: 16 }}>
@@ -515,9 +572,32 @@ function Lesson({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, 
             <span className="badge badge-muted"><Clock size={11} /> {lesson.minutes} min read</span>
             {done && <span className="badge badge-green"><Check size={10} /> Completed</span>}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {lesson.body.map((text, i) => <p key={i} style={{ fontSize: 14.5, lineHeight: 1.75, color: "var(--text-2)" }}>{text}</p>)}
+          <div onMouseUp={captureSelection} onTouchEnd={captureSelection} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {lesson.body.map((text, i) => (
+              <p key={i} style={{ fontSize: 14.5, lineHeight: 1.75, color: "var(--text-2)" }}>
+                <HighlightedText text={text} snippets={highlights} color={mod.color} />
+              </p>
+            ))}
           </div>
+
+          {highlights.length > 0 && (
+            <div style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid var(--glass-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <Highlighter size={13} style={{ color: "var(--gold-2)" }} />
+                <span className="section-label">Highlights ({highlights.length})</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {highlights.map((h) => (
+                  <div key={h} className="glass" style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 13px", borderLeft: `3px solid ${mod.color}` }}>
+                    <span style={{ flex: 1, fontSize: 13, color: "var(--text-2)", lineHeight: 1.5 }}>{h}</span>
+                    <button onClick={() => removeHighlight(lesson.id, h)} aria-label="Remove highlight" style={{ flexShrink: 0, display: "flex", padding: 4, borderRadius: 6, border: "none", background: "none", cursor: "pointer", color: "var(--text-3)" }}>
+                      <X size={14} style={{ color: "var(--text-3)" }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div style={{ marginTop: 28, paddingTop: 20, borderTop: "1px solid var(--glass-border)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <div style={{ width: 3, height: 15, borderRadius: 2, background: mod.color }} />
@@ -678,6 +758,168 @@ function Flash({ FLASHCARDS, progress, flashMode, flipped, flashIdx, flashDeck, 
         </div>
         <div className="progress-track"><div className="progress-fill" style={{ width: `${(mastered / cards.length) * 100}%`, background: "linear-gradient(90deg, var(--green) 0%, var(--primary) 100%)" }} /></div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────── Search ─────────── */
+function SearchTab({ MODULES, FLASHCARDS, query, setQuery, openLesson, openCard }) {
+  const results = lib.searchCurriculum(MODULES, FLASHCARDS, query);
+  const lessons = results.filter((r) => r.type === "lesson");
+  const cards = results.filter((r) => r.type === "flashcard");
+  const trimmed = query.trim();
+
+  return (
+    <div className="fadein">
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "var(--text-1)", marginBottom: 14 }}>Search</h1>
+      <div className="glass" style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 14px", marginBottom: 18 }}>
+        <Search size={17} style={{ color: "var(--text-3)", flexShrink: 0 }} />
+        <input
+          autoFocus value={query} onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search lessons & flashcards…"
+          style={{ flex: 1, minWidth: 0, padding: "12px 0", background: "none", border: "none", outline: "none", color: "var(--text-1)", fontSize: 15, fontFamily: "var(--font-body)" }}
+        />
+        {query && (
+          <button onClick={() => setQuery("")} aria-label="Clear" style={{ display: "flex", padding: 5, border: "none", background: "none", cursor: "pointer" }}>
+            <X size={16} style={{ color: "var(--text-3)" }} />
+          </button>
+        )}
+      </div>
+
+      {trimmed.length < 2 ? (
+        <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--text-3)", fontSize: 13.5 }}>Type at least two characters to search.</div>
+      ) : results.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "32px 16px", color: "var(--text-3)", fontSize: 13.5 }}>No matches for “{trimmed}”.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          {lessons.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 8 }}><span className="section-label">Lessons ({lessons.length})</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {lessons.map((r) => (
+                  <button key={r.lessonId} className="glass glass-btn" onClick={() => openLesson(r.moduleId, r.lessonId)} style={{ display: "block", width: "100%", textAlign: "left", padding: "13px 15px", borderLeft: `3px solid ${r.color}` }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: r.color, marginBottom: 4 }}>{r.moduleTitle}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)", marginBottom: 3 }}>{r.title}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5 }}>{r.snippet}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {cards.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 8 }}><span className="section-label">Flashcards ({cards.length})</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {cards.map((r) => (
+                  <button key={r.index} className="glass glass-btn" onClick={() => openCard(r.index)} style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left", padding: "13px 15px" }}>
+                    <CreditCard size={16} style={{ color: "var(--gold-2)", flexShrink: 0 }} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text-1)", marginBottom: 2 }}>{r.term}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.5 }}>{r.snippet}</div>
+                    </div>
+                    <ChevronRight size={15} style={{ color: "var(--text-3)", flexShrink: 0 }} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─────────── Saved ─────────── */
+function SavedTab({ MODULES, progress, openLesson, toggleBookmark, removeHighlight }) {
+  const lessonOf = (id) => {
+    for (const mod of MODULES) {
+      const l = mod.lessons.find((x) => x.id === id);
+      if (l) return { mod, lesson: l };
+    }
+    return null;
+  };
+  const bookmarks = Object.keys(progress.bookmarks || {}).map(lessonOf).filter(Boolean);
+  const highlightEntries = Object.entries(progress.highlights || {})
+    .map(([id, snippets]) => ({ ref: lessonOf(id), snippets })).filter((e) => e.ref && e.snippets.length);
+  const noteEntries = Object.entries(progress.notes || {})
+    .filter(([, v]) => v && v.trim()).map(([id, text]) => ({ ref: lessonOf(id), text })).filter((e) => e.ref);
+  const empty = !bookmarks.length && !highlightEntries.length && !noteEntries.length;
+
+  return (
+    <div className="fadein">
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "var(--text-1)", marginBottom: 4 }}>Saved</h1>
+      <p style={{ fontSize: 12.5, color: "var(--text-2)", marginBottom: 18 }}>Bookmarks, highlights, and notes.</p>
+
+      {empty ? (
+        <div className="glass" style={{ textAlign: "center", padding: "36px 20px" }}>
+          <Bookmark size={24} style={{ color: "var(--text-3)", margin: "0 auto 10px" }} />
+          <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-1)", marginBottom: 5 }}>Nothing saved yet</div>
+          <div style={{ fontSize: 12.5, color: "var(--text-3)", lineHeight: 1.6 }}>Bookmark a lesson or highlight a sentence to collect it here.</div>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+          {bookmarks.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 10 }}><span className="section-label">Bookmarks ({bookmarks.length})</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {bookmarks.map(({ mod, lesson }) => (
+                  <div key={lesson.id} className="glass" style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", borderLeft: `3px solid ${mod.color}` }}>
+                    <button onClick={() => openLesson(mod.id, lesson.id)} style={{ flex: 1, minWidth: 0, textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: mod.color, marginBottom: 3 }}>{mod.title}</div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)" }}>{lesson.title}</div>
+                    </button>
+                    <button onClick={() => toggleBookmark(lesson.id)} aria-label="Remove bookmark" style={{ flexShrink: 0, display: "flex", padding: 7, borderRadius: 999, border: "1px solid var(--gold-ring)", background: "var(--gold-dim)", cursor: "pointer" }}>
+                      <Bookmark size={14} style={{ color: "var(--gold-2)" }} fill="var(--gold-2)" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {highlightEntries.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 10 }}><span className="section-label">Highlights</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {highlightEntries.map(({ ref, snippets }) => (
+                  <div key={ref.lesson.id}>
+                    <button onClick={() => openLesson(ref.mod.id, ref.lesson.id)} style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 7, background: "none", border: "none", cursor: "pointer", padding: 0, color: ref.mod.color, fontSize: 12, fontWeight: 600 }}>
+                      {ref.lesson.title} <ChevronRight size={12} />
+                    </button>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {snippets.map((h) => (
+                        <div key={h} className="glass" style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 13px", borderLeft: `3px solid ${ref.mod.color}` }}>
+                          <span style={{ flex: 1, fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.5 }}>{h}</span>
+                          <button onClick={() => removeHighlight(ref.lesson.id, h)} aria-label="Remove highlight" style={{ flexShrink: 0, display: "flex", padding: 4, border: "none", background: "none", cursor: "pointer" }}>
+                            <X size={13} style={{ color: "var(--text-3)" }} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {noteEntries.length > 0 && (
+            <div>
+              <div style={{ marginBottom: 10 }}><span className="section-label">Notes</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {noteEntries.map(({ ref, text }) => (
+                  <button key={ref.lesson.id} className="glass glass-btn" onClick={() => openLesson(ref.mod.id, ref.lesson.id)} style={{ display: "block", width: "100%", textAlign: "left", padding: "13px 15px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
+                      <StickyNote size={13} style={{ color: "var(--text-3)" }} />
+                      <span style={{ fontSize: 12, fontWeight: 600, color: ref.mod.color }}>{ref.lesson.title}</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.55, whiteSpace: "pre-wrap", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{text}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
