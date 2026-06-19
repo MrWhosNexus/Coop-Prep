@@ -40,7 +40,7 @@ export default function CoverLetterTool({ state, dispatch, onOpenSettings }) {
 
   /* ─── field change helper ─── */
   function handleField(key, value) {
-    dispatch(setCoverLetterField(state, key, value));
+    dispatch((s) => setCoverLetterField(s, key, value));
   }
 
   /* ─── AI flow ─── */
@@ -55,7 +55,7 @@ export default function CoverLetterTool({ state, dispatch, onOpenSettings }) {
       const filled = fillPrompt(PROMPTS.coverLetter.user, fields);
       const result = await callLLM({ system: PROMPTS.coverLetter.system, user: filled });
       if (result.ok) {
-        dispatch(setCoverLetterAIResponse(state, result.text, !!result.warning));
+        dispatch((s) => setCoverLetterAIResponse(s, result.text, !!result.warning));
         setError("");
       } else if (result.error.type === "API_ERROR") {
         setError(`Provider error ${result.error.status}. Check your AI Settings.`);
@@ -218,7 +218,7 @@ export default function CoverLetterTool({ state, dispatch, onOpenSettings }) {
           {aiResponse && (
             <button
               className="btn-ghost"
-              onClick={() => dispatch(clearCoverLetterAIResponse(state))}
+              onClick={() => dispatch((s) => clearCoverLetterAIResponse(s))}
             >
               Revert to draft
             </button>

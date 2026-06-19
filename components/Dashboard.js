@@ -173,7 +173,9 @@ export default function Dashboard() {
   }
   function openModule(id) { setView("module"); setActiveModuleId(id); }
   function openTool(id) { setView("tool"); setActiveToolId(id); }
-  function dispatchTool(newState) { setProgress(newState); lib.saveProgress(newState); }
+  function dispatchTool(updater) {
+    setProgress((prev) => { const next = updater(prev); lib.saveProgress(next); return next; });
+  }
   function openLesson(modId, lessonId) {
     setView("lesson");
     setActiveModuleId(modId);
