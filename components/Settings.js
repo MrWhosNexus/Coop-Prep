@@ -21,7 +21,7 @@ export default function Settings({ onClose, onSaved }) {
   }
 
   function handleSave() {
-    setAIConfig({ apiKey, endpoint, model });
+    setAIConfig({ apiKey, endpoint, model, presetId: config.presetId ?? AI_PRESETS[0].id });
     setSaved(true);
     onSaved?.();
     // Keep Settings mounted briefly so the "Saved ✓" confirmation is visible.
