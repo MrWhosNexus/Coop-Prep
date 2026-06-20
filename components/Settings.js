@@ -21,11 +21,15 @@ export default function Settings({ onClose, onSaved }) {
   }
 
   function handleSave() {
-    setAIConfig({ apiKey, endpoint, model });
+    setAIConfig({ apiKey, endpoint, model, presetId: config.presetId ?? AI_PRESETS[0].id });
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
     onSaved?.();
-    onClose?.();
+    // Keep Settings mounted briefly so the "Saved ✓" confirmation is visible.
+    // Closing in the same flush as setSaved(true) unmounts before it can render.
+    setTimeout(() => {
+      setSaved(false);
+      onClose?.();
+    }, 1200);
   }
 
   function handleClearKey() {
