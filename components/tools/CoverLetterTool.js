@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { setCoverLetterField, setCoverLetterAIResponse, clearCoverLetterAIResponse, assembleCoverLetter } from "@/lib/tools/coverLetter";
+import { setCoverLetterField, setCoverLetterAIResponse, clearCoverLetterAIResponse, assembleCoverLetter, defaultCoverLetterState } from "@/lib/tools/coverLetter";
 import { callLLM } from "@/lib/ai/client";
 import { hasAIKey } from "@/lib/ai/config";
 import { fillPrompt } from "@/lib/ai/fill-prompt";
@@ -34,7 +34,7 @@ export default function CoverLetterTool({ state, dispatch, onOpenSettings }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const cl = state.tools.coverLetter;
+  const cl = state.tools?.coverLetter ?? defaultCoverLetterState;
   const fields = cl.fields;
   const aiResponse = cl.aiResponse;
 
@@ -76,7 +76,9 @@ export default function CoverLetterTool({ state, dispatch, onOpenSettings }) {
     const a = document.createElement("a");
     a.href = url;
     a.download = "cover-letter.txt";
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
