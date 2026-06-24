@@ -5,7 +5,7 @@ import {
   ChevronRight, ChevronLeft, Clock, HelpCircle, Lock, CheckCircle2,
   Check, ArrowLeft, ArrowRight, Lightbulb, RotateCcw, Play, Square,
   TrendingUp, Award, Sun, Moon, CalendarDays,
-  Search, Bookmark, X, Highlighter, StickyNote,
+  Search, Bookmark, X, Highlighter, StickyNote, MessageSquare,
 } from "lucide-react";
 
 /* Mobile port of the "COOP Prep" Claude Design UI — same light Liquid-Glass
@@ -54,6 +54,9 @@ export default function MobileApp() {
   const [flashIdx, setFlashIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [flashMode, setFlashMode] = useState("all");
+
+  const [interviewModuleId, setInterviewModuleId] = useState("all");
+  const [revealedAnswers, setRevealedAnswers] = useState({});
 
   const [focusRunning, setFocusRunning] = useState(false);
   const [focusSeconds, setFocusSeconds] = useState(0);
@@ -164,6 +167,7 @@ export default function MobileApp() {
     timers.current.push(t);
   }
   function chooseFlashMode(m) { setFlashMode(m); setFlashIdx(0); setFlipped(false); }
+  function toggleRevealAnswer(idx) { setRevealedAnswers((r) => ({ ...r, [idx]: !r[idx] })); }
   function markKnown() {
     const deck = flashDeck();
     const len = deck.length;
@@ -185,7 +189,7 @@ export default function MobileApp() {
     );
   }
 
-  const { MODULES, FLASHCARDS } = lib;
+  const { MODULES, FLASHCARDS, INTERVIEW_QUESTIONS } = lib;
   const allLessons = MODULES.flatMap((m) => m.lessons);
   const totalLessons = allLessons.length;
   const doneLessons = allLessons.filter((l) => progress.completed[l.id]).length;
@@ -199,6 +203,7 @@ export default function MobileApp() {
     { id: "home", label: "Home", Icon: LayoutDashboard },
     { id: "modules", label: "Modules", Icon: BookOpen },
     { id: "flash", label: "Cards", Icon: CreditCard },
+    { id: "interview", label: "Interview", Icon: MessageSquare },
     { id: "search", label: "Search", Icon: Search },
     { id: "saved", label: "Saved", Icon: Bookmark },
   ];
@@ -232,6 +237,9 @@ export default function MobileApp() {
         )}
         {view === "flash" && (
           <Flash {...{ FLASHCARDS, progress, flashMode, flipped, flashIdx, flashDeck, chooseFlashMode, flip, navCard, markKnown, goTab }} />
+        )}
+        {view === "interview" && (
+          <InterviewPrep {...{ MODULES, INTERVIEW_QUESTIONS, interviewModuleId, setInterviewModuleId, revealedAnswers, toggleRevealAnswer }} />
         )}
         {view === "search" && (
           <SearchTab {...{ MODULES, FLASHCARDS, query, setQuery, openLesson, openCard }} />
@@ -632,8 +640,8 @@ function Lesson({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, 
               <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)", marginBottom: 14, lineHeight: 1.5 }}><span style={{ color: "var(--text-3)", fontWeight: 400, marginRight: 6 }}>{qi + 1}.</span>{q.q}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {q.options.map((opt, oi) => {
-                  const selected = answers[qi] === opt;
-                  const isCorrect = opt === q.a;
+                  const selected = answers[qi] === opt.text;
+                  const isCorrect = opt.text === q.a;
                   let bg = "var(--glass-fill)", border = "var(--glass-border)", color = "var(--text-2)";
                   if (submitted) {
                     if (isCorrect) { bg = "var(--green-dim)"; border = "var(--green-ring)"; color = "var(--green-2)"; }
@@ -641,14 +649,19 @@ function Lesson({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, 
                     else { color = "var(--text-3)"; }
                   } else if (selected) { bg = "var(--primary-dim)"; border = "var(--primary-ring)"; color = "var(--primary-2)"; }
                   return (
-                    <button key={oi} onClick={() => pickAnswer(qi, opt)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 13px", borderRadius: "var(--r-md)", background: bg, border: `1px solid ${border}`, color, fontSize: 13.5, fontWeight: 500, textAlign: "left", cursor: submitted ? "default" : "pointer", fontFamily: "var(--font-body)" }}>
+                    <button key={oi} onClick={() => pickAnswer(qi, opt.text)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 13px", borderRadius: "var(--r-md)", background: bg, border: `1px solid ${border}`, color, fontSize: 13.5, fontWeight: 500, textAlign: "left", cursor: submitted ? "default" : "pointer", fontFamily: "var(--font-body)" }}>
                       <span className="mono" style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, flexShrink: 0 }}>{String.fromCharCode(65 + oi)}.</span>
                       {submitted && isCorrect && <CheckCircle2 size={13} style={{ color: "var(--green-2)", flexShrink: 0 }} />}
-                      <span>{opt}</span>
+                      <span>{opt.text}</span>
                     </button>
                   );
                 })}
               </div>
+              {submitted && (
+                <div style={{ marginTop: 10, padding: "11px 13px", borderRadius: "var(--r-md)", background: "var(--glass-fill)", border: "1px solid var(--glass-border)", fontSize: 12.5, color: "var(--text-2)", lineHeight: 1.6 }}>
+                  <strong style={{ color: "var(--text-1)" }}>Why: </strong>{q.explanation}
+                </div>
+              )}
             </div>
           ))}
           {submitted ? (
@@ -675,6 +688,14 @@ function Lesson({ MODULES, progress, activeModuleId, activeLessonId, lessonTab, 
             </div>
             <p style={{ fontSize: 14.5, lineHeight: 1.7, color: "var(--text-2)" }}>{lesson.challenge}</p>
           </div>
+          {lesson.exampleOutput && (
+            <div className="glass" style={{ padding: 18, marginBottom: 14, borderLeft: "3px solid var(--green-ring)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <CheckCircle2 size={13} style={{ color: "var(--green-2)" }} /><span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--green-2)" }}>Correct Solution Looks Like</span>
+              </div>
+              <p style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--text-2)" }}>{lesson.exampleOutput}</p>
+            </div>
+          )}
           <div style={{ padding: "13px 16px", borderRadius: "var(--r-md)", background: "var(--glass-fill)", border: "1px solid var(--glass-border)", fontSize: 13, color: "var(--text-3)", lineHeight: 1.6 }}><strong style={{ color: "var(--text-2)" }}>Tip:</strong> Write your answer in Notes on the Lesson tab.</div>
         </div>
       )}
@@ -757,6 +778,67 @@ function Flash({ FLASHCARDS, progress, flashMode, flipped, flashIdx, flashDeck, 
           <span className="mono" style={{ fontSize: 12, color: "var(--text-3)", fontWeight: 600 }}>{mastered}/{cards.length}</span>
         </div>
         <div className="progress-track"><div className="progress-fill" style={{ width: `${(mastered / cards.length) * 100}%`, background: "linear-gradient(90deg, var(--green) 0%, var(--primary) 100%)" }} /></div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── Interview Prep ─────────── */
+function InterviewPrep({ MODULES, INTERVIEW_QUESTIONS, interviewModuleId, setInterviewModuleId, revealedAnswers, toggleRevealAnswer }) {
+  const questions = interviewModuleId === "all"
+    ? INTERVIEW_QUESTIONS
+    : INTERVIEW_QUESTIONS.filter((q) => q.moduleId === interviewModuleId);
+
+  const typeColor = { technical: "var(--primary-2)", behavioral: "var(--gold-2)", case: "var(--green-2)" };
+  const typeLabel = { technical: "Technical", behavioral: "Behavioral", case: "Case" };
+
+  return (
+    <div className="fadein">
+      <div style={{ marginBottom: 14 }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "var(--text-1)" }}>Interview Prep</h1>
+        <p style={{ fontSize: 12.5, color: "var(--text-2)", marginTop: 4 }}>Mock questions a COOP fellowship interviewer would ask. Tap to reveal a sample answer.</p>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 16 }}>
+        <button onClick={() => setInterviewModuleId("all")} style={{ flexShrink: 0, padding: "7px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, fontFamily: "var(--font-body)", cursor: "pointer", border: `1px solid ${interviewModuleId === "all" ? "var(--primary-ring)" : "var(--glass-border)"}`, background: interviewModuleId === "all" ? "var(--primary-dim)" : "var(--glass-fill)", color: interviewModuleId === "all" ? "var(--primary-2)" : "var(--text-2)" }}>
+          All ({INTERVIEW_QUESTIONS.length})
+        </button>
+        {MODULES.map((m) => {
+          const count = INTERVIEW_QUESTIONS.filter((q) => q.moduleId === m.id).length;
+          const active = interviewModuleId === m.id;
+          return (
+            <button key={m.id} onClick={() => setInterviewModuleId(m.id)} style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "7px 14px", borderRadius: 999, fontSize: 12.5, fontWeight: 600, fontFamily: "var(--font-body)", cursor: "pointer", border: `1px solid ${active ? hexA(m.color, 0.4) : "var(--glass-border)"}`, background: active ? hexA(m.color, 0.16) : "var(--glass-fill)", color: active ? m.color : "var(--text-2)" }}>
+              <span>{m.icon}</span>{m.title} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {questions.map((q, qi) => {
+          const mod = MODULES.find((m) => m.id === q.moduleId);
+          const revealed = !!revealedAnswers[qi];
+          return (
+            <div key={qi} className="glass" style={{ padding: 16, borderLeft: `3px solid ${hexA(mod?.color || "#888", 0.5)}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", color: mod?.color }}>{mod?.title}</span>
+                <span className="badge" style={{ background: hexA(typeColor[q.type], 0.14), color: typeColor[q.type], border: `1px solid ${hexA(typeColor[q.type], 0.3)}` }}>{typeLabel[q.type]}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: revealed ? 12 : 0 }}>
+                <MessageSquare size={14} style={{ color: "var(--text-3)", marginTop: 2, flexShrink: 0 }} />
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-1)", lineHeight: 1.5 }}>{q.question}</div>
+              </div>
+              {revealed && (
+                <div style={{ padding: "12px 14px", borderRadius: "var(--r-md)", background: "var(--glass-fill)", border: "1px solid var(--glass-border)", fontSize: 13, color: "var(--text-2)", lineHeight: 1.65, marginBottom: 10 }}>
+                  {q.sampleAnswer}
+                </div>
+              )}
+              <button onClick={() => toggleRevealAnswer(qi)} className="btn-ghost" style={{ width: "100%", padding: "9px 0", fontSize: 12.5 }}>
+                {revealed ? "Hide sample answer" : "Reveal sample answer"}
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

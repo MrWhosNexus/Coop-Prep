@@ -828,8 +828,8 @@ function LessonView({ MODULES, progress, activeModuleId, activeLessonId, lessonT
                 <div style={{ fontSize: 14.5, fontWeight: 600, color: "var(--text-1)", marginBottom: 16, lineHeight: 1.5 }}><span style={{ color: "var(--text-3)", fontWeight: 400, marginRight: 6 }}>{qi + 1}.</span>{q.q}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {q.options.map((opt, oi) => {
-                    const selected = answers[qi] === opt;
-                    const isCorrect = opt === q.a;
+                    const selected = answers[qi] === opt.text;
+                    const isCorrect = opt.text === q.a;
                     let bg = "var(--glass-fill)", border = "var(--glass-border)", color = "var(--text-2)";
                     if (submitted) {
                       if (isCorrect) { bg = "var(--green-dim)"; border = "var(--green-ring)"; color = "var(--green-2)"; }
@@ -837,14 +837,19 @@ function LessonView({ MODULES, progress, activeModuleId, activeLessonId, lessonT
                       else { color = "var(--text-3)"; }
                     } else if (selected) { bg = "var(--primary-dim)"; border = "var(--primary-ring)"; color = "var(--primary-2)"; }
                     return (
-                      <button key={oi} onClick={() => pickAnswer(qi, opt)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: "var(--r-md)", background: bg, border: `1px solid ${border}`, color, fontSize: 13.5, fontWeight: 500, textAlign: "left", cursor: submitted ? "default" : "pointer", transition: "background .12s, border-color .12s, color .12s", fontFamily: "var(--font-body)" }}>
+                      <button key={oi} onClick={() => pickAnswer(qi, opt.text)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "11px 14px", borderRadius: "var(--r-md)", background: bg, border: `1px solid ${border}`, color, fontSize: 13.5, fontWeight: 500, textAlign: "left", cursor: submitted ? "default" : "pointer", transition: "background .12s, border-color .12s, color .12s", fontFamily: "var(--font-body)" }}>
                         <span className="mono" style={{ fontSize: 11, fontWeight: 700, opacity: 0.5, flexShrink: 0 }}>{String.fromCharCode(65 + oi)}.</span>
                         {submitted && isCorrect && <Icon name="circleCheck" size={13} color="var(--green-2)" />}
-                        <span>{opt}</span>
+                        <span>{opt.text}</span>
                       </button>
                     );
                   })}
                 </div>
+                {submitted && (
+                  <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: "var(--r-md)", background: "var(--glass-fill)", border: "1px solid var(--glass-border)", fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
+                    <strong style={{ color: "var(--text-1)" }}>Why: </strong>{q.explanation}
+                  </div>
+                )}
               </div>
             ))}
             {submitted ? (
@@ -871,6 +876,14 @@ function LessonView({ MODULES, progress, activeModuleId, activeLessonId, lessonT
               </div>
               <p style={{ fontSize: 15, lineHeight: 1.75, color: "var(--text-2)" }}>{lesson.challenge}</p>
             </div>
+            {lesson.exampleOutput && (
+              <div className="glass" style={{ padding: 20, marginBottom: 16, borderLeft: `3px solid var(--green-ring)` }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                  <Icon name="circleCheck" size={14} color="var(--green-2)" /><span style={{ fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--green-2)" }}>What a Correct Solution Looks Like</span>
+                </div>
+                <p style={{ fontSize: 14, lineHeight: 1.7, color: "var(--text-2)" }}>{lesson.exampleOutput}</p>
+              </div>
+            )}
             <div style={{ padding: "14px 18px", borderRadius: "var(--r-md)", background: "var(--glass-fill)", border: "1px solid var(--glass-border)", fontSize: 13.5, color: "var(--text-3)", lineHeight: 1.6 }}><strong style={{ color: "var(--text-2)" }}>Tip:</strong> Write your answer in Notes on the Lesson tab. Challenges are for reflection — no submission needed.</div>
           </div>
         )}
